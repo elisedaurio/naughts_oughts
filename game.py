@@ -37,9 +37,15 @@ def validate_turn():
     print("Validated the turn. Proceed.")
 
 # Attempt to execute a turn
+# By the end of this function, we should have commited the turn the DB or returned an error. 
+# If 
 def execute_turn():
     print("Do a turn")
 
+# Finalize a turn to get the next turn opened up
+# This is where we commit to the D
+def finalize_turn():
+    print("Finalized the turn. Replying to user")
     
 # This will be defined if I have time.
 #def check_db_for_player(player_id):
