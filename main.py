@@ -10,7 +10,7 @@ from game import Row
 from game import Game
 from game import GameStorage
 from game import Turn
-from game import execute_turn
+from game import submit_turn
 # This will be done if I have time left to do provided player_ids
 # from game import check_db_for_player
 from rich import print, print_json
@@ -79,8 +79,9 @@ def start_new_game(player_id = None):
     
     # We need to take a turn right away if the CPU was given turn 1
     if first_turn == 1:
-        # Stuff
-        execute_turn()
+        # Computer submits a turn
+        cpu_turn = Turn(turn_number=1, player="cpu", row=randint(1,3), col=randint(1,3))
+        submit_turn(cpu_turn)
         return {"message":"New game created with ID: "+ f"{game_id}" + "Your player ID for this game is: " + f"{player}" + " Note: The CPU had the first turn, Check the game's history for it's action."}
     else:
         # We return the normal messaging if the human player is the first actor

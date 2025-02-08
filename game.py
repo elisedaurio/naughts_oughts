@@ -31,6 +31,13 @@ class GameStorage(AbstractRepository[Game]):
     class Meta:
         collection_name = "games"
 
+# Submit a turn
+# This function is the abstraction of a turn into something uniform to save sanity for devs who dare to look at the main.py file.
+def submit_turn(submitted_turn):
+    validate_turn(submitted_turn)
+    execute_turn(submitted_turn)
+    finalize_turn(submitted_turn)
+    
 # Make sure the turn is valid.
 def validate_turn():
     # This is a set of the rules needed to be followed to make sure a turn is valid.
