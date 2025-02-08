@@ -9,7 +9,8 @@ from fastapi import FastAPI
 from game import Row
 from game import Game
 from game import GameStorage
-from game import check_db_for_player
+# This will be done if I have time left to do provided player_ids
+# from game import check_db_for_player
 from rich import print, print_json
 
 # Start logger
@@ -50,9 +51,13 @@ def read_root():
 def start_new_game(player_id = None):
     # Set up a game
     
-    if player_id == None:
-        check_db_for_player(player)
+    # "Future" support for a provided player_id
+    # Because it's awful UX if you can't used an ID you want to use. But I don't want to think about how to bind it to a specific person
+    # Since it's opening up the whole mess of needing to password/secure it, and there's almost certianly not time for this.
+    #if player_id == None:
+    #    check_db_for_player(player)
     # Player ID is unique each time, it's a hyper basic authentication method. We give it to them at the start and call it good.
+    
     # This could be improved by adding support for a provided player ID to let you stack up games on your single ID 
     player = uuid4()
     
@@ -68,7 +73,6 @@ def start_new_game(player_id = None):
     logging.info("Created new game. Dumping model")
     logging.info(new_game.model_dump)
     # Insert the new game to the DB
-    #game_id = game_repo.insert_one(new_game.model_dump_json).inserted_id
     game_id = storage.save(new_game).inserted_id
     return {"message":"New game created with ID: "+ f"{game_id}" + "Your player ID for this game is: " + f"{player}"}
 

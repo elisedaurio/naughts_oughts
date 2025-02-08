@@ -17,3 +17,7 @@ class Game(BaseModel):
 class GameStorage(AbstractRepository[Game]):
     class Meta:
         collection_name = "games"
+
+def check_db_for_player(player_id):
+    # Check the DB to see if the player ID exists.
+    
