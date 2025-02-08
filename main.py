@@ -95,7 +95,7 @@ def play_game():
 # Requirement:
 # Allows me to view all moves in a game, chronologically ordered.
 @app.get("/no/{game_id}/history")
-def play_game():
+def play_history():
     return {"message":"Return the history of plays for the given game_id"}
 
 # Return the play history for a player with the given ID.
@@ -105,5 +105,5 @@ def play_game():
 # Requirement: 
 # Allows me to view all games I have played, chronologically ordered.
 @app.get("/no/{player_id}/history")
-def play_game():
+def player_history():
     return {"message":"Get the history of games played for a specific player_id"}
