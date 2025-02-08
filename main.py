@@ -32,11 +32,19 @@ except ConnectionError:
 
 # Start FastAPI
 app = FastAPI()
-    
+
+# There's no requirements on root. So just error out/tell the user what to do.    
 @app.get("/")
 def read_root():
-    return {"Hello": "World"}
+    return {"message": "Welcome to Naughts and Oughts. Functionality can be found on the /no/* endpoints."}
 
+# Create a new Game.
+#
+# This involves initializing a new game, with a new player ID.
+# TODO: Add optional player ID support.
+#
+# Requirement:
+# Allows me to create a new game of Noughts and Crosses, and returns the game ID.
 @app.get("/no/new")
 # This can't be async because we're making a hard DB call. (At least, FastAPI thinks it shouldn't be async)
 def start_new_game(player_id = None):
@@ -64,6 +72,34 @@ def start_new_game(player_id = None):
     game_id = storage.save(new_game).inserted_id
     return {"message":"New game created with ID: "+ f"{game_id}" + "Your player ID for this game is: " + f"{player}"}
 
+# Make a play on an existing game.
+# 
+# Needs the ID of the game that is being played.
+# Needs to have the player ID for that game, else you aren't authorized.
+# It'll be a query param for me, most likely. It should really be a header field. I'll do one of these.
+#
+# Requirement:
+# Allows me to make the next move by specifying the co-ordinates I wish to move on. e.g. {"x": 1, "y": 1} 
+# would denote a move to the middle square by the requesting player, and returns the new state of the board after the computer has made its move in turn. 
+# Note: There is no need to create an AI opponent, random moves are fine
 @app.get("/no/play/{game_id}")
 def play_game():
-    return {"messaage":"New game created: "}
+    return {"message":"Play a turn on a game"}
+
+# Return the plays done in order of a given game
+#
+# Requirement:
+# Allows me to view all moves in a game, chronologically ordered.
+@app.get("/no/{game_id}/history")
+def play_game():
+    return {"message":"Return the history of plays for the given game_id"}
+
+# Return the play history for a player with the given ID.
+#
+# Return nothing on a miss, on a hit return the list of game_ids of played games.
+#
+# Requirement: 
+# Allows me to view all games I have played, chronologically ordered.
+@app.get("/no/{player_id}/history")
+def play_game():
+    return {"message":"Get the history of games played for a specific player_id"}
