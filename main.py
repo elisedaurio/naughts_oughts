@@ -9,7 +9,10 @@ from fastapi import FastAPI
 from game import Row
 from game import Game
 from game import GameStorage
-from game import check_db_for_player
+from game import Turn
+from game import submit_turn
+# This will be done if I have time left to do provided player_ids
+# from game import check_db_for_player
 from rich import print, print_json
 
 # Start logger
@@ -50,9 +53,13 @@ def read_root():
 def start_new_game(player_id = None):
     # Set up a game
     
-    if player_id == None:
-        check_db_for_player(player)
+    # "Future" support for a provided player_id
+    # Because it's awful UX if you can't used an ID you want to use. But I don't want to think about how to bind it to a specific person
+    # Since it's opening up the whole mess of needing to password/secure it, and there's almost certianly not time for this.
+    #if player_id == None:
+    #    check_db_for_player(player)
     # Player ID is unique each time, it's a hyper basic authentication method. We give it to them at the start and call it good.
+    
     # This could be improved by adding support for a provided player ID to let you stack up games on your single ID 
     player = uuid4()
     
@@ -68,9 +75,17 @@ def start_new_game(player_id = None):
     logging.info("Created new game. Dumping model")
     logging.info(new_game.model_dump)
     # Insert the new game to the DB
-    #game_id = game_repo.insert_one(new_game.model_dump_json).inserted_id
     game_id = storage.save(new_game).inserted_id
-    return {"message":"New game created with ID: "+ f"{game_id}" + "Your player ID for this game is: " + f"{player}"}
+    
+    # We need to take a turn right away if the CPU was given turn 1
+    if first_turn == 1:
+        # Computer submits a turn
+        cpu_turn = Turn(turn_number=1, player="cpu", row=randint(1,3), col=randint(1,3))
+        submit_turn(cpu_turn)
+        return {"message":"New game created with ID: "+ f"{game_id}" + "Your player ID for this game is: " + f"{player}" + " Note: The CPU had the first turn, Check the game's history for it's action."}
+    else:
+        # We return the normal messaging if the human player is the first actor
+        return {"message":"New game created with ID: "+ f"{game_id}" + "Your player ID for this game is: " + f"{player}"}
 
 # Make a play on an existing game.
 # 
@@ -82,8 +97,8 @@ def start_new_game(player_id = None):
 # Allows me to make the next move by specifying the co-ordinates I wish to move on. e.g. {"x": 1, "y": 1} 
 # would denote a move to the middle square by the requesting player, and returns the new state of the board after the computer has made its move in turn. 
 # Note: There is no need to create an AI opponent, random moves are fine
-@app.get("/no/play/{game_id}")
-def play_game():
+@app.post("/no/play/{game_id}")
+def play_game_turn(turn: Turn):
     return {"message":"Play a turn on a game"}
 
 # Return the plays done in order of a given game
@@ -91,7 +106,7 @@ def play_game():
 # Requirement:
 # Allows me to view all moves in a game, chronologically ordered.
 @app.get("/no/{game_id}/history")
-def play_game():
+def play_history():
     return {"message":"Return the history of plays for the given game_id"}
 
 # Return the play history for a player with the given ID.
@@ -101,5 +116,5 @@ def play_game():
 # Requirement: 
 # Allows me to view all games I have played, chronologically ordered.
 @app.get("/no/{player_id}/history")
-def play_game():
+def player_history():
     return {"message":"Get the history of games played for a specific player_id"}
