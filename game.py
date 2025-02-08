@@ -13,6 +13,7 @@ class Row(BaseModel):
 # If a user attempts an invalid action, that doesn't "count" for their turn being executed.
 class Turn(BaseModel):
     # Starts at 1, iterates until win.
+    # Must be provided when posting a move in order to make sure you aren't cheating~
     turn_number: int
     player: str
     row: int
@@ -30,7 +31,16 @@ class GameStorage(AbstractRepository[Game]):
     class Meta:
         collection_name = "games"
 
+# Make sure the turn is valid.
+def validate_turn():
+    # This is a set of the rules needed to be followed to make sure a turn is valid.
+    print("Validated the turn. Proceed.")
+
+# Attempt to execute a turn
+def execute_turn():
+    print("Do a turn")
+
+    
 # This will be defined if I have time.
 #def check_db_for_player(player_id):
 #    # Check the DB to see if the player ID exists.
-    

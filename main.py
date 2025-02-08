@@ -9,6 +9,8 @@ from fastapi import FastAPI
 from game import Row
 from game import Game
 from game import GameStorage
+from game import Turn
+from game import execute_turn
 # This will be done if I have time left to do provided player_ids
 # from game import check_db_for_player
 from rich import print, print_json
@@ -74,7 +76,15 @@ def start_new_game(player_id = None):
     logging.info(new_game.model_dump)
     # Insert the new game to the DB
     game_id = storage.save(new_game).inserted_id
-    return {"message":"New game created with ID: "+ f"{game_id}" + "Your player ID for this game is: " + f"{player}"}
+    
+    # We need to take a turn right away if the CPU was given turn 1
+    if first_turn == 1:
+        # Stuff
+        execute_turn()
+        return {"message":"New game created with ID: "+ f"{game_id}" + "Your player ID for this game is: " + f"{player}" + " Note: The CPU had the first turn, Check the game's history for it's action."}
+    else:
+        # We return the normal messaging if the human player is the first actor
+        return {"message":"New game created with ID: "+ f"{game_id}" + "Your player ID for this game is: " + f"{player}"}
 
 # Make a play on an existing game.
 # 
@@ -86,8 +96,8 @@ def start_new_game(player_id = None):
 # Allows me to make the next move by specifying the co-ordinates I wish to move on. e.g. {"x": 1, "y": 1} 
 # would denote a move to the middle square by the requesting player, and returns the new state of the board after the computer has made its move in turn. 
 # Note: There is no need to create an AI opponent, random moves are fine
-@app.get("/no/play/{game_id}")
-def play_game():
+@app.post("/no/play/{game_id}")
+def play_game_turn(turn: Turn):
     return {"message":"Play a turn on a game"}
 
 # Return the plays done in order of a given game
