@@ -103,12 +103,41 @@ def validate_turn(incoming_turn: Turn, db_storage:GameStorage):
 
 # Attempt to execute a turn
 # By the end of this function, we should have commited the turn the DB or returned an error. 
-# If 
-def execute_turn(validated_turn):
-    print("Do a turn")
+def execute_turn(validated_turn: Turn, db_storage: GameStorage):
+    # Pull in the game from the turn
+    try:
+        current_game = Game(db_storage.find_one_by_id(validated_turn.game_id))
+    except:
+        logging.info("Error loading the game.")
 
-# Finalize a turn to get the next turn opened up
-# This is where we commit to the D
+    # Update the game object
+    # Save the turn into the history
+    current_game.turn_history.append(validated_turn)
+
+    # Set the mark to add to the board
+    # Note: Players are always "O" and Cpus are always "X"
+    if validated_turn.player == "cpu":
+        mark = "X"
+    else:
+        mark = "O"
+    current_game.game_board[validated_turn.row-1][validated_turn.col-1] = mark
+    
+    # Increase the turn count
+    current_game.current_turn = current_game.current_turn+1
+    
+    # Change the player to the CPU or the player
+    if current_game.active_player == "cpu":
+        current_game.active_player = current_game.player_id
+    else:
+        current_game.active_player = "cpu"
+
+    # Submit the turn to the DB and update everything.
+    try:
+        db_storage.save(current_game)
+    except:
+        logging.error("Error saving game updates to DB")
+    
+# Finalize a turn to figure out if the game is over 
 def finalize_turn():
     print("Finalized the turn. Replying to user")
     
