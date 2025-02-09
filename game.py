@@ -93,12 +93,13 @@ def validate_turn(incoming_turn: Turn, db_storage:GameStorage):
         else:
             logging.info("Valid coordinates submitted.")
     # Was the the (x,y) coordinate Null or populated?
-    # Recall this is a list, so we need to fix the index offset by removing 1
-    if current_game.game_board[(incoming_turn.row-1)].
+    # Recall this is a list of lists, so we need to fix the index offsets by removing 1
+    if current_game.game_board[(incoming_turn.row-1)][incoming_turn.col-1] is not "":
+        logging.info("Submitted a row and column that isn't empty. Submitted: " + f"{incoming_turn.row}")
+        return False
     
     print("Validated the turn. Proceed to submission.")
-    return(True)
-    
+    return True
 
 # Attempt to execute a turn
 # By the end of this function, we should have commited the turn the DB or returned an error. 
