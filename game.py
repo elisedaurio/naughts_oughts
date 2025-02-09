@@ -27,8 +27,8 @@ class Game(BaseModel):
     player_id: uuid.UUID
     game_board: List[Row]
     current_turn: int
-    turn_history: List[Turn]
-    game_over: bool
+    turn_history: List[Turn] = None
+    game_over: bool = False
 
 class GameStorage(AbstractRepository[Game]):
     class Meta:
@@ -54,14 +54,14 @@ def submit_turn(submitted_turn):
     
 # Make sure the turn is valid.
 # This will return true if the turn is valid from what we can tell.
-def validate_turn(incoming_turn):
+def validate_turn(incoming_turn, game_id):
     # This is a set of the rules needed to be followed to make sure a turn is valid.
     print("Validated the turn. Proceed.")
 
 # Attempt to execute a turn
 # By the end of this function, we should have commited the turn the DB or returned an error. 
 # If 
-def execute_turn():
+def execute_turn(validated_turn):
     print("Do a turn")
 
 # Finalize a turn to get the next turn opened up
