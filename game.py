@@ -7,11 +7,6 @@ import logging
 
 logging.basicConfig(filename="no_gamelogic.log", level=logging.INFO)
 
-class Row(BaseModel):
-    col_1: Optional[str] = ""
-    col_2: Optional[str] = ""
-    col_3: Optional[str] = ""
-
 # A turn consists of an iterator, the player who takes the turn, and their selection.
 #
 # If a user attempts an invalid action, that doesn't "count" for their turn being executed.
@@ -32,7 +27,7 @@ class Game(BaseModel):
     # Active player is either the CPU or the player. Capture the string representation here
     active_player: str = None
     # The current state of the game board. A list of three rows
-    game_board: List[Row]
+    game_board: List
     # The current turn number. (Tracking how many turns have occurred.)
     current_turn: int
     # Capture each turn as it happens
@@ -70,9 +65,7 @@ def validate_turn(incoming_turn: Turn, db_storage:GameStorage):
     # Load the game from the game_id
     current_game = Game(db_storage.find_one_by_id(incoming_turn.game_id))
     
-    
-    
-    # Validation list:
+    # Validations
     # Is the game over?
     if current_game.game_over == True:
         # Failed
@@ -84,13 +77,26 @@ def validate_turn(incoming_turn: Turn, db_storage:GameStorage):
         # The wrong turn was submitted
         logging.info("Game with ID: " + f"{current_game.id}" + " is not currently on the submitted turn of: " + f"{incoming_turn.turn_number}" + ". It is on turn: " + f"{current_game.current_turn}")
         return False
-    # Is this right player taking a turn?
-    if current_game.
-    # Was x and y 1,2 or 3?
-    # Was the the (x,y) coordinate Null or populated?
     
-    is_game_over = 
-    print("Validated the turn. Proceed.")
+    # Is this right player taking a turn?
+    if current_game.active_player != incoming_turn.player:
+        logging.info("Game with ID: " + f"{current_game.id}" + " is not currently on the player's  turn. Please wait for the CPU to take a turn.")
+        return False        
+    # Was x and y 1,2 or 3?
+    if incoming_turn.col not in { 1,2,3}:
+        logging.info("Submitted a column value that isn't valid. Submitted: " + f"{incoming_turn.col}")
+        return False
+    else:
+        if incoming_turn.row not in { 1,2,3}:
+            logging.info("Submitted a row value that isn't valid. Submitted: " + f"{incoming_turn.row}")
+            return False
+        else:
+            logging.info("Valid coordinates submitted.")
+    # Was the the (x,y) coordinate Null or populated?
+    # Recall this is a list, so we need to fix the index offset by removing 1
+    if current_game.game_board[(incoming_turn.row-1)].
+    
+    print("Validated the turn. Proceed to submission.")
     return(True)
     
 

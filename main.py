@@ -67,8 +67,7 @@ def start_new_game(player_id = None):
     # Initialize the game object
     # Note: The player is always 0 in the turn order. 1 is the Cpu
     first_turn = randint(0,1)
-    initial_row = Row()
-    initial_board = [initial_row,initial_row,initial_row]
+    initial_board = [["","",""], ["","",""],["","",""]]
     new_game = Game(player_id=bson_player, game_board=initial_board, current_turn=first_turn)
     logging.info("Created new game. Dumping model")
     logging.info(new_game.model_dump)
