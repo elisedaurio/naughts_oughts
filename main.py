@@ -95,11 +95,11 @@ def start_new_game(player_id = None):
 # would denote a move to the middle square by the requesting player, and returns the new state of the board after the computer has made its move in turn. 
 # Note: There is no need to create an AI opponent, random moves are fine
 @app.post("/no/playturn")
-def play_game_turn(incoming_turn: Turn):
+def play_game_turn(incoming_turn: Turn, db_storage: GameStorage):
     # Submit a turn
     
     # This will require the game_id, the turn contents, and a reference to the storage collection.
-    submit_turn(incoming_turn, game_id, db_storage)
+    submit_turn(incoming_turn, db_storage)
     
     return {"message":"Play a turn on a game"}
 
