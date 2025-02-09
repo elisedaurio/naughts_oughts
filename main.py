@@ -65,7 +65,7 @@ def start_new_game(player_id = None):
     bson_player = bson.Binary.from_uuid(player)
     
     # Initialize the game object
-    # Note: The player is always 0 in the turn order. 1 is the Cpu
+    # Note: The player is always 1 in the turn order. 0 is the Cpu
     first_turn = randint(0,1)
     initial_board = [["","",""], ["","",""],["","",""]]
     new_game = Game(player_id=bson_player, game_board=initial_board, current_turn=first_turn)
@@ -75,7 +75,7 @@ def start_new_game(player_id = None):
     game_id = storage.save(new_game).inserted_id
     
     # We need to take a turn right away if the CPU was given turn 1
-    if first_turn == 1:
+    if first_turn == 0:
         # Computer submits a turn
         cpu_turn = Turn(turn_number=1, player="cpu", row=randint(1,3), col=randint(1,3))
         submit_turn(cpu_turn)
