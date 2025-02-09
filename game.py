@@ -2,6 +2,9 @@ from pydantic import BaseModel
 from pydantic_mongo import PydanticObjectId, AbstractRepository
 from typing import List, Optional
 import uuid
+import logging
+
+logging.basicConfig(filename="no_gamelogic.log", level=logging.INFO)
 
 class Row(BaseModel):
     col_1: Optional[str] = ""
@@ -34,12 +37,24 @@ class GameStorage(AbstractRepository[Game]):
 # Submit a turn
 # This function is the abstraction of a turn into something uniform to save sanity for devs who dare to look at the main.py file.
 def submit_turn(submitted_turn):
-    validate_turn(submitted_turn)
-    execute_turn(submitted_turn)
-    finalize_turn(submitted_turn)
+    turn_validation = validate_turn(submitted_turn)
+    if turn_validation == True:
+        executed_turn = execute_turn(submitted_turn)
+        if executed_turn == True:
+            finalized_turn = finalize_turn(submitted_turn)
+            if finalize_turn == False:
+                logging.info("Turn failed to finalize.")
+            else:
+                logging.info("Turn successful.")
+        else: 
+            logging.info("Turn failed to execute.")
+    else: 
+        logging.info("Turn failed to validate.")
+
     
 # Make sure the turn is valid.
-def validate_turn():
+# This will return true if the turn is valid from what we can tell.
+def validate_turn(incoming_turn):
     # This is a set of the rules needed to be followed to make sure a turn is valid.
     print("Validated the turn. Proceed.")
 
