@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from pydantic_mongo import PydanticObjectId, AbstractRepository
 from typing import List, Optional
+from random import randint
 from pymongo import MongoClient
 import uuid
 import logging
@@ -46,10 +47,10 @@ class GameStorage(AbstractRepository[Game]):
 def submit_turn(submitted_turn, db_storage):
     turn_validation = validate_turn(submitted_turn, db_storage)
     if turn_validation == True:
-        executed_turn = execute_turn(submitted_turn)
+        executed_turn = execute_turn(submitted_turn, db_storage)
         if executed_turn == True:
-            finalized_turn = finalize_turn()
-            if finalize_turn == False:
+            finalized_turn = finalize_turn(submitted_turn, db_storage)
+            if finalized_turn == False:
                 logging.info("Turn failed to finalize.")
             else:
                 logging.info("Turn successful.")
@@ -235,11 +236,20 @@ def finalize_turn(executed_turn: Turn, db_storage: GameStorage):
     except:
         logging.error("Error saving game updates to DB")
     
-    # If we are at the CPU turn, do it.
-    if last_turn_cpu == True:
-
-    return True
-    
-# This will be defined if I have time.
-#def check_db_for_player(player_id):
-#    # Check the DB to see if the player ID exists.
+    # Submit a new turn if the CPU is up
+    if last_turn_cpu is False:
+        # Get the current turn
+        cpu_turn_number = current_game.current_turn
+        
+        # Generate random row/col combos until you get a null coordinate
+        empty_coordinate = False
+        while empty_coordinate is False:
+            test_row = randint(1, 3)
+            test_col = randint(1,3)
+            if current_game.game_boar[test_row][test_col] == "":
+                empty_coordinate = True
+            else:
+                cpu_row = test_row
+                cpu_col = test_col
+        cpu_turn = Turn(turn_number=cpu_turn_number, player="cpu", row=cpu_row, col=cpu_col)
+        submit_turn(cpu_turn)
