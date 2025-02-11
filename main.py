@@ -1,10 +1,9 @@
 import bson
 import logging
-from uuid import uuid4
+import uuid
 from pymongo import MongoClient
 from random import randint
 from fastapi import FastAPI
-from game import Row
 from game import Game
 from game import GameStorage
 from game import Turn
@@ -21,6 +20,9 @@ logging.basicConfig(filename="no.log", level=logging.INFO)
 host = "localhost"
 port = 27017
 
+# Realistically this should be an environment variable
+cpu_uuid = uuid.UUID("4711e492-f922-4d20-99cf-51d4606bd314")
+
 try:
     db_client = MongoClient(host, port, uuidRepresentation='standard')
     # Naughts and oughts DB
@@ -29,7 +31,6 @@ try:
     storage = GameStorage(database=db)
 except ConnectionError:
     print("DB Connection error: " + ConnectionError.message)
-
 
 # Start FastAPI
 app = FastAPI()
@@ -48,7 +49,7 @@ def read_root():
 # Allows me to create a new game of Noughts and Crosses, and returns the game ID.
 @app.get("/no/new")
 # This can't be async because we're making a hard DB call. (At least, FastAPI thinks it shouldn't be async)
-def start_new_game(player_id = None):
+def start_new_game():
     # Set up a game
     
     # "Future" support for a provided player_id
@@ -59,7 +60,7 @@ def start_new_game(player_id = None):
     # Player ID is unique each time, it's a hyper basic authentication method. We give it to them at the start and call it good.
     
     # This could be improved by adding support for a provided player ID to let you stack up games on your single ID 
-    player = uuid4()
+    player = uuid.uuid4()
     
     # We need to convert the ID into something that MongoDB is happy storing
     bson_player = bson.Binary.from_uuid(player)
@@ -67,8 +68,16 @@ def start_new_game(player_id = None):
     # Initialize the game object
     # Note: The player is always 1 in the turn order. 0 is the Cpu
     first_turn = randint(0,1)
+    # We need to set the active player based on this result
     initial_board = [["","",""], ["","",""],["","",""]]
-    new_game = Game(player_id=bson_player, game_board=initial_board, current_turn=first_turn)
+    new_game = Game(player_id=bson_player, game_board=initial_board, current_turn=1, active_player=player)
+    
+    # Set the active player based on the first_turn outcome
+    if first_turn == 0:
+        new_game.active_player = cpu_uuid
+    else:
+        new_game.active_player = player
+    
     logging.info("Created new game. Dumping model")
     logging.info(new_game.model_dump)
     # Insert the new game to the DB
@@ -77,12 +86,12 @@ def start_new_game(player_id = None):
     # We need to take a turn right away if the CPU was given turn 1
     if first_turn == 0:
         # Computer submits a turn
-        cpu_turn = Turn(turn_number=1, player="cpu", row=randint(1,3), col=randint(1,3))
+        cpu_turn = Turn(turn_number=1, player=cpu_uuid, row=randint(1,3), col=randint(1,3),game_id=new_game.id)
         submit_turn(cpu_turn)
-        return {"message":"New game created with ID: "+ f"{game_id}" + "Your player ID for this game is: " + f"{player}" + " Note: The CPU had the first turn, Check the game's history for it's action."}
+        return {"message":"New game created with ID: "+ f"{game_id}" + " \nYour player ID for this game is: " + f"{player}" + " Note: The CPU had the first turn, Check the game's history for it's action."}
     else:
         # We return the normal messaging if the human player is the first actor
-        return {"message":"New game created with ID: "+ f"{game_id}" + "Your player ID for this game is: " + f"{player}"}
+        return {"message":"New game created with ID: "+ f"{game_id}" + " \nYour player ID for this game is: " + f"{player}"}
 
 # Make a play on an existing game.
 # 
@@ -95,13 +104,25 @@ def start_new_game(player_id = None):
 # would denote a move to the middle square by the requesting player, and returns the new state of the board after the computer has made its move in turn. 
 # Note: There is no need to create an AI opponent, random moves are fine
 @app.post("/no/playturn")
-def play_game_turn(incoming_turn: Turn, db_storage: GameStorage):
+def play_game_turn(incoming_turn: Turn):
     # Submit a turn
-    
     # This will require the game_id, the turn contents, and a reference to the storage collection.
-    submit_turn(incoming_turn, db_storage)
+    submit_turn(incoming_turn)
     
-    return {"message":"Play a turn on a game"}
+    # Load the game one last time to deliver the game state on return
+    try:
+        # Load the game from the game_id
+        loaded_game_from_id = storage.find_one_by_id(incoming_turn.game_id)
+        current_game_state = Game(
+            player_id=loaded_game_from_id.player_id, 
+            game_board=loaded_game_from_id.game_board, 
+            current_turn=loaded_game_from_id.current_turn, 
+            active_player=loaded_game_from_id.active_player,
+            game_over=loaded_game_from_id.game_over
+            )
+    except:
+        logging.info("Error loading the game.")        
+    return {"message":"Turn completed. New game state: " + f"{current_game_state.model_dump_json}"}
 
 # Return the plays done in order of a given game
 #
