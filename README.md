@@ -14,7 +14,7 @@
 - There was roughly two hours not captured here in my figuring out how to develop on my personal Windows machine without tools like PyCharm.
 - By the turn execution stage, I've roughly spent three hours on the actual work.
     - I've spent another thirty or so minutes on handling things in Github, or reading how to leverage MongoDB + Pydantic correctly.
-- By the final commit to MVP, I've spent roughly four hours on the actual problem at hand, and more on the tooling around it.
+- By the final commit to MVP, I've spent roughly four hours on the actual problem at hand, and much more on the tooling around it.
   
 ## Trade-offs 
 - The most apparent trade off I made was around unit testing.
@@ -22,7 +22,7 @@
     - Timed exercises like this aren't good candidates for unit testing/integration testing.
         - I'd argue you can easily do this, if you're consistently using the language and framework.
             - I'm a casual polyglot who speaks in several different scripting languages, I'm not really what I'd consider an expert of any of them. But I can utilize nearly any of them to fairly useful effect.
-            - I most recently developed in HCL with Terraform.
+            - I most recently developed in HCL for Terraform.
 - I wanted to dynamically select the first player, between the CPU and the human.
     - This didn't really work out the way I wanted it to work out in the end. That's okay, but still frustrating.
     - I think if I hadn't felt the time pressure, I would have continued down the path I was on, but ended up refactored some pieces instead.
