@@ -1,8 +1,9 @@
 from pydantic import BaseModel
+import bson
 from fastapi import HTTPException
 from pymongo import MongoClient
-from pydantic_mongo import PydanticObjectId, AbstractRepository
-from pyobjectID import PyObjectId, MongoObjectId
+from pydantic_mongo import AbstractRepository
+from pyobjectID import PyObjectId
 from typing import List, Optional
 from random import randint
 import uuid
@@ -27,8 +28,10 @@ class Turn(BaseModel):
     col: int    
 
 class Game(BaseModel):
-    # The ID of the game
+    # The ID of the game in the DB
     id: PyObjectId = None
+    # Unique game ID
+    game_id: PyObjectId
     # UUID of the human player
     player_id: uuid.UUID
     # Active player is either the CPU or the player. Capture the string representation here
@@ -42,7 +45,7 @@ class Game(BaseModel):
     # Track if the game has ended
     game_over: bool = False
     # Who won the game if it's over?
-    game_winner: Optional[str] = None
+    game_winner: Optional[uuid.UUID] = None
 
 class GameStorage(AbstractRepository[Game]):
     class Meta:
@@ -92,11 +95,13 @@ def validate_turn(incoming_turn: Turn, db_storage:GameStorage):
         # Load the game from the game_id
         loaded_game_from_id = db_storage.find_one_by_id(incoming_turn.game_id)
         current_game = Game(
+            game_id=loaded_game_from_id.game_id,
             player_id=loaded_game_from_id.player_id, 
             game_board=loaded_game_from_id.game_board, 
             current_turn=loaded_game_from_id.current_turn, 
             active_player=loaded_game_from_id.active_player,
-            game_over=loaded_game_from_id.game_over
+            game_over=loaded_game_from_id.game_over,
+            turn_history=loaded_game_from_id.turn_history
             )
     except:
         logging.info("Error loading the game.")
@@ -105,19 +110,19 @@ def validate_turn(incoming_turn: Turn, db_storage:GameStorage):
     # Is the game over?
     if current_game.game_over == True:
         # Failed
-        logging.info("Game with ID: " + f"{current_game.id}" + " is already over.")
-        return False
+        logging.info("Game with ID: " + f"{incoming_turn.game_id}" + " is already over.")
+        raise HTTPException(status_code=400, detail="Game with ID: " + f"{incoming_turn.game_id}" + " is already over.")
     
     # Was the right turn submitted?
     if current_game.current_turn != incoming_turn.turn_number:
         # The wrong turn was submitted
-        logging.info("Game with ID: " + f"{current_game.id}" + " is not currently on the submitted turn of: " + f"{incoming_turn.turn_number}" + ". It is on turn: " + f"{current_game.current_turn}")
-        raise HTTPException(status_code=400, detail="Game with ID: " + f"{current_game.id}" + " is not currently on the submitted turn of: " + f"{incoming_turn.turn_number}" + ". It is on turn: " + f"{current_game.current_turn}")
+        logging.info("Game with ID: " + f"{incoming_turn.game_id}" + " is not currently on the submitted turn of: " + f"{incoming_turn.turn_number}" + ". It is on turn: " + f"{current_game.current_turn}")
+        raise HTTPException(status_code=400, detail="Game with ID: " + f"{incoming_turn.game_id}" + " is not currently on the submitted turn of: " + f"{incoming_turn.turn_number}" + ". It is on turn: " + f"{current_game.current_turn}")
     
     # Is this right player taking a turn?
     if current_game.active_player != incoming_turn.player:
-        logging.info("Game with ID: " + f"{current_game.id}" + " is not currently on the player's  turn. Please wait for the CPU to take a turn.")
-        raise HTTPException(status_code=400, detail="Game with ID: " + f"{current_game.id}" + " is not currently on the player's  turn. Please wait for the CPU to take a turn.")        
+        logging.info("Game with ID: " + f"{incoming_turn.game_id}" + " is not currently on the player's  turn. Please wait for the CPU to take a turn.")
+        raise HTTPException(status_code=400, detail="Game with ID: " + f"{incoming_turn.game_id}" + " is not currently on the player's  turn. Please wait for the CPU to take a turn.")        
     # Was x and y 1,2 or 3?
     if incoming_turn.col not in {1,2,3}:
         logging.info("Submitted a column value that isn't valid. Submitted: " + f"{incoming_turn.col}")
@@ -139,24 +144,22 @@ def validate_turn(incoming_turn: Turn, db_storage:GameStorage):
 # By the end of this function, we should have commited the turn the DB or returned an error. 
 def execute_turn(validated_turn: Turn, db_storage: GameStorage):
     # Pull in the game from the turn
-    
-    print("Start execution: Game ID: " + f"{validated_turn.game_id}")
     try:
         # Load the game from the game_id
         loaded_game_from_id = db_storage.find_one_by_id(validated_turn.game_id)
-        print("Loaded game from DB: " + f"{loaded_game_from_id.model_dump}")
         current_game = Game(
-            id=validated_turn.game_id,
+            game_id=loaded_game_from_id.game_id,
             player_id=loaded_game_from_id.player_id, 
             game_board=loaded_game_from_id.game_board, 
             current_turn=loaded_game_from_id.current_turn, 
             active_player=loaded_game_from_id.active_player,
-            game_over=loaded_game_from_id.game_over
+            game_over=loaded_game_from_id.game_over,
+            turn_history=loaded_game_from_id.turn_history
             )
     except:
         logging.info("Error loading the game.")
 
-    print("Open successful: " + f"{current_game.model_dump}")
+    logging.info("Open successful: " + f"{current_game.model_dump}")
     # Update the game object
     # Save the turn into the history
     current_game.turn_history.append(validated_turn)
@@ -197,11 +200,13 @@ def finalize_turn(executed_turn: Turn, db_storage: GameStorage):
         # Load the game from the game_id
         loaded_game_from_id = db_storage.find_one_by_id(executed_turn.game_id)
         current_game = Game(
+            game_id=loaded_game_from_id.game_id,
             player_id=loaded_game_from_id.player_id, 
             game_board=loaded_game_from_id.game_board, 
             current_turn=loaded_game_from_id.current_turn, 
             active_player=loaded_game_from_id.active_player,
-            game_over=loaded_game_from_id.game_over
+            game_over=loaded_game_from_id.game_over,
+            turn_history=loaded_game_from_id.turn_history
             )
     except:
         logging.info("Error loading the game.")  
@@ -217,11 +222,13 @@ def finalize_turn(executed_turn: Turn, db_storage: GameStorage):
                 if current_game.game_board[row_number][0] == "X":
                     logging.info("CPU has a row win.")
                     current_game.game_over = True
-                    current_game.game_winner = cpu_uuid
+                    bson_winner = bson.Binary.from_uuid(cpu_uuid)
+                    current_game.game_winner = bson_winner
                 else:
                     logging.info("Player has a row win.")
                     current_game.game_over = True
-                    current_game.game_winner = current_game.player_id
+                    bson_winner = bson.Binary.from_uuid(current_game.player_id)
+                    current_game.game_winner = bson_winner
     
     # Column win
     # I realize this a huge DRY violation. I'm short on time :(. Can I use a "We'll fix it in the next iteration?" here?
@@ -234,11 +241,13 @@ def finalize_turn(executed_turn: Turn, db_storage: GameStorage):
                 if current_game.game_board[0][col_number] == "X":
                     logging.info("CPU has a column win.")
                     current_game.game_over = True
-                    current_game.game_winner = cpu_uuid
+                    bson_winner = bson.Binary.from_uuid(cpu_uuid)
+                    current_game.game_winner = bson_winner
                 else:
                     logging.info("Player has a column win.")
                     current_game.game_over = True
-                    current_game.game_winner = current_game.player_id
+                    bson_winner = bson.Binary.from_uuid(current_game.player_id)
+                    current_game.game_winner = bson_winner
     # Diagonal win
     # Yes, this is another huge DRY failure. Clear optimization could come from fixing how this being handled. (Namely, check for all three win states at once.)
     # This would be (0,0) + (1,1) + (2,2)
@@ -251,11 +260,13 @@ def finalize_turn(executed_turn: Turn, db_storage: GameStorage):
             if current_game.game_board[1][1] == "X":
                 logging.info("CPU has a diagonal win.")
                 current_game.game_over = True
-                current_game.game_winner = cpu_uuid
+                bson_winner = bson.Binary.from_uuid(cpu_uuid)
+                current_game.game_winner = bson_winner
             else:
                 logging.info("Player has a diagonal win.")
                 current_game.game_over = True
-                current_game.game_winner = current_game.player_id
+                bson_winner = bson.Binary.from_uuid(current_game.player_id)
+                current_game.game_winner = bson_winner
                 
     # Other diagonal win.
     if current_game.game_board[0][2] == current_game.game_board[1][1] == current_game.game_board[2][0]:
@@ -266,13 +277,22 @@ def finalize_turn(executed_turn: Turn, db_storage: GameStorage):
             if current_game.game_board[1][1] == "X":
                 logging.info("CPU has a diagonal win.")
                 current_game.game_over = True
-                current_game.game_winner = cpu_uuid
+                bson_winner = bson.Binary.from_uuid(cpu_uuid)
+                current_game.game_winner = bson_winner
             else:
                 logging.info("Player has a diagonal win.")
                 current_game.game_over = True
-                current_game.game_winner = current_game.player_id
-                    
+                bson_winner = bson.Binary.from_uuid(current_game.player_id)
+                current_game.game_winner = bson_winner
+                
+    # Store the state of the game if we made changes
+    try:
+        db_storage.save(current_game)
+    except:
+        logging.error("Error saving game updates to DB")
+        
     # If we haven't gotten a win yet, carry on to the next turn setups and executions.
+    last_turn_cpu = False
     if current_game.game_over == False:
         if executed_turn.player == cpu_uuid:
             logging.info("Previous turn was a CPU turn. No additional turn needed")
@@ -281,27 +301,26 @@ def finalize_turn(executed_turn: Turn, db_storage: GameStorage):
             logging.info("Previous turn was a player. Perform a CPU turn.")
             last_turn_cpu = False
     
-    # Store the state of the game if we made changes
-    try:
-        db_storage.save(current_game)
-    except:
-        logging.error("Error saving game updates to DB")
-    
     # Submit a new turn if the CPU is up
-    if last_turn_cpu == False:
+    if last_turn_cpu == False and current_game.game_over == False:
         # Get the current turn
         cpu_turn_number = current_game.current_turn
         
         # Generate random row/col combos until you get a null coordinate
         empty_coordinate = False
         while empty_coordinate == False:
+            logging.info("Start loop to find empty cell.")
             test_row = randint(1, 3)
             test_col = randint(1,3)
-            if current_game.game_board[test_row][test_col] == "":
+            logging.info("Testing row: " + f"{test_row}" + " and column: " + f"{test_col}")
+            logging.info("Value at location: " + f"{current_game.game_board[test_row-1][test_col-1]}")
+            if current_game.game_board[test_row-1][test_col-1] == "":
+                logging.info("Found  coordinates at row: " + f"{test_row}" + " and column: " + f"{test_col}")
                 empty_coordinate = True
-            else:
                 cpu_row = test_row
                 cpu_col = test_col
-        cpu_turn = Turn(turn_number=cpu_turn_number, player="cpu", row=cpu_row, col=cpu_col)
+            else:
+                empty_coordinate = False
+        cpu_turn = Turn(game_id=executed_turn.game_id,turn_number=cpu_turn_number, player=cpu_uuid, row=cpu_row, col=cpu_col)
         submit_turn(cpu_turn)
     return True
