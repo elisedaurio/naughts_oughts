@@ -1,6 +1,8 @@
 import bson
 import logging
 import uuid
+import pprint
+from pyobjectID import PyObjectId
 from pymongo import MongoClient
 from random import randint
 from fastapi import FastAPI
@@ -13,7 +15,11 @@ from game import submit_turn
 from rich import print, print_json
 
 # Start logger
-logging.basicConfig(filename="no.log", level=logging.INFO)
+logging.basicConfig(
+    filename="no.log",
+    format='%(asctime)s %(levelname)-8s %(message)s',
+    level=logging.INFO,
+    datefmt='%Y-%m-%d %H:%M:%S')
 
 # Start the DB for the game.
 # Requires a default setup of MongoDB, with a collection at `games`
@@ -66,32 +72,15 @@ def start_new_game():
     bson_player = bson.Binary.from_uuid(player)
     
     # Initialize the game object
-    # Note: The player is always 1 in the turn order. 0 is the Cpu
-    first_turn = randint(0,1)
-    # We need to set the active player based on this result
     initial_board = [["","",""], ["","",""],["","",""]]
     new_game = Game(player_id=bson_player, game_board=initial_board, current_turn=1, active_player=player)
     
-    # Set the active player based on the first_turn outcome
-    if first_turn == 0:
-        new_game.active_player = cpu_uuid
-    else:
-        new_game.active_player = player
+    # Set the active player
+    new_game.active_player = player
     
-    logging.info("Created new game. Dumping model")
-    logging.info(new_game.model_dump)
     # Insert the new game to the DB
     game_id = storage.save(new_game).inserted_id
-    
-    # We need to take a turn right away if the CPU was given turn 1
-    if first_turn == 0:
-        # Computer submits a turn
-        cpu_turn = Turn(turn_number=1, player=cpu_uuid, row=randint(1,3), col=randint(1,3),game_id=new_game.id)
-        submit_turn(cpu_turn)
-        return {"message":"New game created with ID: "+ f"{game_id}" + " \nYour player ID for this game is: " + f"{player}" + " Note: The CPU had the first turn, Check the game's history for it's action."}
-    else:
-        # We return the normal messaging if the human player is the first actor
-        return {"message":"New game created with ID: "+ f"{game_id}" + " \nYour player ID for this game is: " + f"{player}"}
+    return {"message":"New game created with ID: "+ f"{game_id}" + " Your player ID for this game is: " + f"{player}"}
 
 # Make a play on an existing game.
 # 
@@ -114,23 +103,42 @@ def play_game_turn(incoming_turn: Turn):
         # Load the game from the game_id
         loaded_game_from_id = storage.find_one_by_id(incoming_turn.game_id)
         current_game_state = Game(
+            game_id=incoming_turn.game_id,
             player_id=loaded_game_from_id.player_id, 
             game_board=loaded_game_from_id.game_board, 
             current_turn=loaded_game_from_id.current_turn, 
             active_player=loaded_game_from_id.active_player,
-            game_over=loaded_game_from_id.game_over
+            game_over=loaded_game_from_id.game_over,
+            turn_history=loaded_game_from_id.turn_history
             )
     except:
-        logging.info("Error loading the game.")        
-    return {"message":"Turn completed. New game state: " + f"{current_game_state.model_dump_json}"}
+        logging.info("Error loading the game.")
+                
+    return {"message":"Turn completed. New game state: " + f"{current_game_state.game_board}"}
 
 # Return the plays done in order of a given game
 #
 # Requirement:
 # Allows me to view all moves in a game, chronologically ordered.
-@app.get("/no/{game_id}/history")
-def play_history():
-    return {"message":"Return the history of plays for the given game_id"}
+@app.post("/no/gamehistory")
+def play_history(game_id: PyObjectId):
+        # Load the game one last time to deliver the game state on return
+    try:
+        # Load the game from the game_id
+        loaded_game_from_id = storage.find_one_by_id(game_id)
+        current_game_state = Game(
+            game_id=loaded_game_from_id.game_id,
+            player_id=loaded_game_from_id.player_id, 
+            game_board=loaded_game_from_id.game_board, 
+            current_turn=loaded_game_from_id.current_turn, 
+            active_player=loaded_game_from_id.active_player,
+            game_over=loaded_game_from_id.game_over,
+            turn_history=loaded_game_from_id.turn_history
+            )
+    except:
+        logging.info("Error loading the game.")   
+             
+    return {"message":"Turn History of game: " + f"{game_id}" + ": " + f"{current_game_state.turn_history}"}
 
 # Return the play history for a player with the given ID.
 #
@@ -138,6 +146,18 @@ def play_history():
 #
 # Requirement: 
 # Allows me to view all games I have played, chronologically ordered.
-@app.get("/no/{player_id}/history")
-def player_history():
-    return {"message":"Get the history of games played for a specific player_id"}
+@app.post("/no/playerhistory")
+def player_history(player_id: uuid.UUID):
+    
+    games_collection=db.get_collection(name="games")
+    results = []
+    try:
+        # Load the game from the game_id
+        for games in games_collection.find({'player_id': player_id}):
+            results.append(games['turn_history'][0]['game_id'])
+    except:
+        logging.error("Error searching DB")
+    
+    # Dedupe the list
+    deduped_results = list(dict.fromkeys(results))
+    return {"message":"Games played by player : " + f"{player_id}" + ": " + f"{deduped_results}"}
