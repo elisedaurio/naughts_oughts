@@ -8,7 +8,11 @@ from random import randint
 import uuid
 import logging
 
-logging.basicConfig(filename="no_gamelogic.log", level=logging.INFO)
+logging.basicConfig(
+    filename="no_gamelogic.log",
+    format='%(asctime)s %(levelname)-8s %(message)s',
+    level=logging.INFO,
+    datefmt='%Y-%m-%d %H:%M:%S')
 
 # A turn consists of an iterator, the player who takes the turn, and their selection.
 #
@@ -64,6 +68,7 @@ def submit_turn(submitted_turn):
         
     turn_validation = validate_turn(submitted_turn, db_storage)
     if turn_validation == True:
+        print("executing turn")
         executed_turn = execute_turn(submitted_turn, db_storage)
         if executed_turn == True:
             finalized_turn = finalize_turn(submitted_turn, db_storage)
@@ -106,12 +111,12 @@ def validate_turn(incoming_turn: Turn, db_storage:GameStorage):
     # Was the right turn submitted?
     if current_game.current_turn != incoming_turn.turn_number:
         # The wrong turn was submitted
-        logging.info("Game with ID: " + f"{current_game.id.to_string()}" + " is not currently on the submitted turn of: " + f"{incoming_turn.turn_number}" + ". It is on turn: " + f"{current_game.current_turn}")
+        logging.info("Game with ID: " + f"{current_game.id}" + " is not currently on the submitted turn of: " + f"{incoming_turn.turn_number}" + ". It is on turn: " + f"{current_game.current_turn}")
         raise HTTPException(status_code=400, detail="Game with ID: " + f"{current_game.id}" + " is not currently on the submitted turn of: " + f"{incoming_turn.turn_number}" + ". It is on turn: " + f"{current_game.current_turn}")
     
     # Is this right player taking a turn?
     if current_game.active_player != incoming_turn.player:
-        logging.info("Game with ID: " + f"{current_game.id.to_string()}" + " is not currently on the player's  turn. Please wait for the CPU to take a turn.")
+        logging.info("Game with ID: " + f"{current_game.id}" + " is not currently on the player's  turn. Please wait for the CPU to take a turn.")
         raise HTTPException(status_code=400, detail="Game with ID: " + f"{current_game.id}" + " is not currently on the player's  turn. Please wait for the CPU to take a turn.")        
     # Was x and y 1,2 or 3?
     if incoming_turn.col not in {1,2,3}:
@@ -126,20 +131,22 @@ def validate_turn(incoming_turn: Turn, db_storage:GameStorage):
     # Was the the (x,y) coordinate Null or populated?
     # Recall this is a list of lists, so we need to fix the index offsets by removing 1
     if current_game.game_board[(incoming_turn.row-1)][incoming_turn.col-1] != "":
-        logging.info("Submitted a row and column that isn't empty. Submitted: " + f"{incoming_turn.row}")
-        raise HTTPException(status_code=400, detail="Submitted a row and column that isn't empty. Submitted: " + f"{incoming_turn.row}") 
-    
-    print("Validated the turn. Proceed to submission.")
+        logging.info("Submitted a row and column that isn't empty. Submitted: " + f"{incoming_turn.row}" + " Submitted Column: " + f"{incoming_turn.col}")
+        raise HTTPException(status_code=400, detail="Submitted a row and column that isn't empty. Submitted Row: " + f"{incoming_turn.row}" + " Submitted Column: " + f"{incoming_turn.col}") 
     return True
 
 # Attempt to execute a turn
 # By the end of this function, we should have commited the turn the DB or returned an error. 
 def execute_turn(validated_turn: Turn, db_storage: GameStorage):
     # Pull in the game from the turn
+    
+    print("Start execution: Game ID: " + f"{validated_turn.game_id}")
     try:
         # Load the game from the game_id
         loaded_game_from_id = db_storage.find_one_by_id(validated_turn.game_id)
+        print("Loaded game from DB: " + f"{loaded_game_from_id.model_dump}")
         current_game = Game(
+            id=validated_turn.game_id,
             player_id=loaded_game_from_id.player_id, 
             game_board=loaded_game_from_id.game_board, 
             current_turn=loaded_game_from_id.current_turn, 
@@ -149,9 +156,11 @@ def execute_turn(validated_turn: Turn, db_storage: GameStorage):
     except:
         logging.info("Error loading the game.")
 
+    print("Open successful: " + f"{current_game.model_dump}")
     # Update the game object
     # Save the turn into the history
     current_game.turn_history.append(validated_turn)
+    logging.info("Completed append to history")
     
     # Set the mark to add to the board
     # Note: Players are always "O" and Cpus are always "X"
@@ -160,6 +169,7 @@ def execute_turn(validated_turn: Turn, db_storage: GameStorage):
     else:
         mark = "O"
     current_game.game_board[validated_turn.row-1][validated_turn.col-1] = mark
+    logging.info("Using mark: " + f"{mark}" + " added new play to game board: " + f"{current_game.game_board}")
     
     # Increase the turn count
     current_game.current_turn = current_game.current_turn+1
@@ -175,10 +185,8 @@ def execute_turn(validated_turn: Turn, db_storage: GameStorage):
         # We know the game will be over here. We don't know the winner, but we know 
         current_game.game_over = True
     # Submit the turn to the DB and update everything.
-    try:
-        db_storage.save(current_game)
-    except:
-        logging.error("Error saving game updates to DB")
+    db_storage.save(current_game)
+    return True
     
 # Finalize a turn to figure out if the game is over 
 def finalize_turn(executed_turn: Turn, db_storage: GameStorage):
@@ -289,10 +297,11 @@ def finalize_turn(executed_turn: Turn, db_storage: GameStorage):
         while empty_coordinate == False:
             test_row = randint(1, 3)
             test_col = randint(1,3)
-            if current_game.game_boar[test_row][test_col] == "":
+            if current_game.game_board[test_row][test_col] == "":
                 empty_coordinate = True
             else:
                 cpu_row = test_row
                 cpu_col = test_col
         cpu_turn = Turn(turn_number=cpu_turn_number, player="cpu", row=cpu_row, col=cpu_col)
         submit_turn(cpu_turn)
+    return True

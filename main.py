@@ -13,7 +13,11 @@ from game import submit_turn
 from rich import print, print_json
 
 # Start logger
-logging.basicConfig(filename="no.log", level=logging.INFO)
+logging.basicConfig(
+    filename="no.log",
+    format='%(asctime)s %(levelname)-8s %(message)s',
+    level=logging.INFO,
+    datefmt='%Y-%m-%d %H:%M:%S')
 
 # Start the DB for the game.
 # Requires a default setup of MongoDB, with a collection at `games`
